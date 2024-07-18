@@ -1,10 +1,24 @@
-apiVersion: apps/v1
-kind: Deployment
+# service must exist before a stateful set
+apiVersion: v1
+kind: Service
 metadata:
-  name: mongo-deployment
+  name: mongo-service
+spec:
+  selector:
+    app: mongo
+  ports:
+  - protocol: TCP
+    port: 27017
+    targetPort: 27017 # should always be the same as the containerPort
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo-statefulset
   labels:
     app: mongo
 spec:
+  serviceName: mongo-service
   replicas: 1
   # all pods that match label belong to this deployment
   selector:
@@ -22,6 +36,9 @@ spec:
         image: mongo:5.0
         ports:
         - containerPort: 27017
+        volumeMounts:
+        - name: mongodbdata
+          mountPath: /data/db
         env:
         - name: MONGO_INITDB_ROOT_USERNAME
           valueFrom:
@@ -33,15 +50,12 @@ spec:
             secretKeyRef:
               name: mongo-secret
               key: mongo-password
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mongo-service
-spec:
-  selector:
-    app: mongo
-  ports:
-  - protocol: TCP
-    port: 27017
-    targetPort: 27017 # should always be the same as the containerPort
+  # having this will automatically create the necessary PersistentVolumeClaims and the underlying storage class will provision the corresponding PersistentVolumes if dynamic provisioning is enabled
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodbdata
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
