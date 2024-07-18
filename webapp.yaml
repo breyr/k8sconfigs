@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-deployment
+  labels:
+    app: webapp
+spec:
+  replicas: 1
+  # all pods that match label belong to this deployment
+  selector:
+    matchLabels:
+      app: webapp
+  # this template is the pod metadata
+  template:
+    metadata:
+      # labels are required for pods
+      labels:
+        app: webapp
+    spec:
+      containers:
+      - name: webapp
+        image: breyr/sampleapp
+        ports:
+        - containerPort: 3000
+        env:
+        - name: USER_NAME
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: mongo-user
+        - name: USER_PWD
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: mongo-password
+        - name: DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mongo-config
+              key: mongo-url
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-service
+spec:
+  type: NodePort
+  selector:
+    app: webapp
+  ports:
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000 # should always be the same as the containerPort
+    nodePort: 30000 # must be between 30000-32767
